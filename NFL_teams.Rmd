@@ -1,0 +1,443 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-03-05"
+---
+
+```{r , warning=FALSE}
+library(tidyverse)
+```
+
+
+
+
+```{r}
+# Creating dataframe named attendance.
+
+attendance = read_csv("/Users/sharadraina/Desktop/archive/Project_03/attendance.csv" , show_col_types = FALSE)
+
+head(attendance)
+
+```
+
+```{r}
+
+#Creating dataframe named standings
+
+standings = read_csv("/Users/sharadraina/Desktop/archive/Project_03/standings.csv" ,show_col_types = FALSE)
+
+head(standings ,5)
+```
+
+
+```{r}
+# Joining the dataframes.
+
+attendance_joined = attendance %>%
+  
+                    left_join(standings , by = c("team" , "team_name" , "year"))
+
+
+```
+
+
+
+```{r}
+# Checking for basic visualizations.
+
+attendance_joined %>%
+  
+  filter(!is.na(weekly_attendance)) %>%
+  
+  ggplot(aes( weekly_attendance  ,fct_reorder(team_name , weekly_attendance)  , fill = playoffs)) +
+
+  geom_boxplot(outlier.alpha = 0.5) 
+  
+ 
+
+
+
+```
+
+##### This visualization reveals that there is some relationship between a teams weekly attendance with there qualifying for playoffs. The teams when they qualified for playoffs had higher weekly attendance as compared to when they didnt qualify for playoffs.
+
+
+
+
+```{r}
+
+attendance_joined %>%
+  
+filter(!is.na(weekly_attendance)) %>%  
+  ggplot(aes(team_name , simple_rating , fill  = playoffs )  ) + 
+  
+  geom_bar(stat = "identity" , position = "dodge") +
+  
+  theme(axis.text.x  = element_text(angle = 45 , hjust = 1)) +
+  coord_flip()
+
+```
+
+##### This reveals a co-relation between rating of teams with there outcome of qualifying for playoffs. The years where they didnt qualify for playoffs were the years where there rating fell.
+
+
+
+
+
+```{r}
+
+attendance_joined %>% 
+  
+  ggplot(aes(factor(week) , weekly_attendance , fill = playoffs)) +
+  
+  geom_bar(stat = "identity" ) +
+  
+  labs(title = "Weekly attendance throught the years" , 
+       
+       x = "Week of the year" , 
+       
+       y = "Weekly Attendance") +
+  
+  theme_light()
+
+
+```
+
+
+##### The start of the season is usually associated with higher weekly attendance followed by a small dip mid-season and again an increase towards the end of the season.
+
+
+```{r}
+
+# Creating the dataframe used for model building.
+
+attendace_df = attendance_joined %>%
+  
+  filter(!is.na(weekly_attendance)) %>%
+  
+  select(team_name , weekly_attendance , week , year , margin_of_victory , strength_of_schedule , playoffs)
+
+
+attendace_df
+
+
+```
+
+
+```{r , warning=FALSE}
+
+# Installing tidymodels package to split data into train and test.
+
+#install.packages("tidymodels")
+
+library(tidymodels)
+
+
+```
+
+```{r}
+
+# Creating an object named attendance_split that stores the split data. Using argument strata = playoffs so that the data is evenly split keeping playoffs in mind.
+
+attendance_split =  attendace_df  %>%
+  
+  initial_split( strata = "playoffs")
+
+
+
+# Calling the training and testing data and storing it into specific objects.
+
+train_data = training(attendance_split)
+
+test_data = testing(attendance_split)
+
+
+```
+
+
+
+
+#### Training models on train data.
+```{r}
+# Building a linear regression model to find out which variables have the maximum impact to my weekly_attendance variable.
+
+linear_model =  linear_reg() %>%
+  
+  fit(data = train_data , weekly_attendance ~.)
+
+
+
+tidy(linear_model) %>% arrange(p.value)
+
+```
+
+
+
+```{r , warning=FALSE}
+
+#install.packages("randomForest")
+
+library(randomForest)
+
+# Building a random forest model for regression.
+
+rf_spec <- rand_forest(mode = "regression") %>%
+  set_engine("ranger")
+
+
+rf_model =  rf_spec %>%
+                
+                    fit(weekly_attendance ~. , train_data)
+rf_model
+
+```
+
+
+
+#### Testing models on test data.
+```{r}
+# CREating a dataframe named results_train which stores the results of the 2 models on training dataset.
+  
+results_train = rbind(predict(linear_model , train_data) %>%
+  
+  mutate(real_value = train_data$weekly_attendance , method = 'lm')  , 
+    
+    predict(rf_model , train_data) %>%
+      
+      mutate(real_value = train_data$weekly_attendance , method = "rf")
+  )
+
+head(results_train)
+
+
+# CREating a dataframe named results_test which stores the results of the 2 models on test dataset.
+
+results_test = rbind(predict(linear_model , test_data) %>%
+  
+  mutate(real_value = test_data$weekly_attendance , method = 'lm')  , 
+  
+  
+    
+    predict(rf_model , test_data) %>%
+      
+      mutate(real_value = test_data$weekly_attendance , method = "rf")
+  )
+
+head(results_test)
+
+
+
+
+
+
+```
+
+
+
+
+```{r}
+results_train %>%
+  
+  group_by(method) %>%
+
+rmse(truth = real_value , estimate = .pred)
+
+
+results_test %>%
+  
+  group_by(method) %>%
+  
+  rmse(truth = real_value , estimate = .pred)
+
+```
+
+##### When I checked how well my models performed on the data they were trained on, the random forest model seemed much better than the linear model. The error was much lower. However, when I tested these models on new data they haven't seen before, the situation changed. My linear model's performance stayed similar between the training and testing, which is good news because it suggests the model isn't overly specialized for the training data. But for the random forest model, the error increased quite a bit on the testing data compared to the training data. This tells me that the random forest model is too focused on the training data and doesn't generalize well to new, unseen data. In other words, it has overfit to the training data.
+
+
+
+
+
+
+#### Visualizing the above results.
+```{r}
+results_test %>%
+  
+  mutate(train = "testing") %>%
+  
+  bind_rows(results_train %>%
+              
+    mutate(train = "training")) %>%
+  
+  ggplot(aes(real_value, .pred, color = method)) +
+  
+  geom_abline(lty = 2, color = "gray80", size = 1.5) +
+  
+  geom_point(alpha = 0.5) +
+  
+  facet_wrap(~train) +
+  
+  labs(
+    x = "Truth",
+    y = "Predicted attendance",
+    color = "Type of model"
+  )
+```
+
+##### Both models appear to have a similar level of accuracy for higher attendance values, as there are several points that fall close to the dotted line representing perfect predictions.
+
+
+##### For lower attendance values, both models tend to over-predict the actual values, as most of the points fall above the dotted line.
+
+
+##### The rf model appears to have slightly more variability in its predictions, as there are more points that fall further away from the dotted line compared to the Im model.
+
+
+```{r}
+rf_spec <- rand_forest(mode = "regression", engine = "ranger") %>%
+  set_mode("regression") %>%
+  set_engine("ranger")
+```
+
+
+
+
+
+
+#### Retraining the random forest model to achieve better results.
+```{r}
+# The function vfold_cv() creates folds for cross-validation
+
+nfl_folds <- vfold_cv(train_data, strata = playoffs)
+
+# The function fit_resamples() fits models to resamples such as these (to measure performance), and then we can collect_metrics() from the result.
+
+
+rf_res <- fit_resamples(
+  rf_spec , 
+  
+ weekly_attendance ~ . , 
+  
+  nfl_folds,
+  
+  control = control_resamples(save_pred = TRUE)
+  
+)
+```
+
+
+
+
+
+```{r}
+
+
+rf_res %>%
+  collect_metrics()
+
+
+
+
+```
+
+
+##### This brings the rmse score close to the the linear model score we obtained in the training data.
+
+
+
+
+
+
+```{r}
+
+
+svm_wf <- workflow() %>%
+  
+  add_model(rf_spec) %>%
+  
+  add_formula(weekly_attendance ~ .)
+
+```
+
+
+
+```{r}
+
+new_model_train =  svm_wf %>%
+  
+  fit(train_data)
+
+
+```
+
+
+
+```{r}
+
+new_results_test = bind_rows( predict(new_model_train , test_data) %>%
+  
+  mutate(real = test_data$weekly_attendance , method = "rf") , 
+
+
+predict(linear_model , test_data) %>%
+            
+            mutate(real = test_data$weekly_attendance , method = "lm"))
+  
+  
+
+head(new_results_test)
+
+```
+
+
+
+```{r}
+
+
+
+results_test %>%
+  
+  group_by(method) %>%
+
+rmse(truth = real_value , estimate = .pred)
+
+
+
+new_results_test %>%
+  
+  group_by(method) %>%
+  
+  rmse(truth = real , estimate = .pred)
+
+
+```
+
+
+
+#### Now the random forest estimate has come closer to train data.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
