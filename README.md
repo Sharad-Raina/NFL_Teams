@@ -30,6 +30,9 @@ attendance_joined %>%
   ggplot(aes(weekly_attendance, fct_reorder(team_name, weekly_attendance), fill = playoffs)) +
   geom_boxplot(outlier.alpha = 0.5)
 ```
+<img width="552" alt="Screenshot 2025-02-07 at 6 47 18 PM" src="https://github.com/user-attachments/assets/08b17a34-255c-4422-8931-85a5b1934625" />
+
+
 
 - **Bar Plot of Team Ratings by Playoff Status**: It revealed that teams with higher ratings had a higher likelihood of qualifying for the playoffs.
 
