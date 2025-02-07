@@ -17,6 +17,9 @@ standings = read_csv("/path/to/standings.csv", show_col_types = FALSE)
 attendance_joined = attendance %>%
   left_join(standings, by = c("team", "team_name", "year"))
 ```
+<img width="913" alt="Screenshot 2025-02-07 at 6 48 34 PM" src="https://github.com/user-attachments/assets/b1076a85-fefd-4d81-9d44-3cb000cbe084" />
+
+
 
 #### 2. Data Visualization
 
