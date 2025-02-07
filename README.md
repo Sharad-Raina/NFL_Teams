@@ -48,6 +48,9 @@ attendance_joined %>%
   coord_flip()
 ```
 
+<img width="508" alt="Screenshot 2025-02-07 at 6 49 36 PM" src="https://github.com/user-attachments/assets/333114ee-c051-481f-a0b2-614161d8e181" />
+
+
 - **Weekly Attendance Trend**: A bar plot illustrated the fluctuation of weekly attendance throughout the season.
 
 ```r
@@ -57,6 +60,9 @@ attendance_joined %>%
   labs(title = "Weekly attendance throughout the years", x = "Week of the year", y = "Weekly Attendance") +
   theme_light()
 ```
+
+<img width="486" alt="Screenshot 2025-02-07 at 6 49 44 PM" src="https://github.com/user-attachments/assets/f68f885c-39ea-41ee-8d6f-1c54aeb2e4bd" />
+
 
 #### 3. Model Building
 
